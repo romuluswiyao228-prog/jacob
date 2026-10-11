@@ -2,11 +2,12 @@
 
 ## Procédure en 5 étapes
 
-### Étape 1 — Inscription
+### Étape 1 — Inscription et confirmation
 
 Aller sur `/inscription` et créer un compte avec l'adresse e-mail
-destinée au propriétaire (ex. `owner@jacob-de-jesus.com`). La
-confirmation d'e-mail est désactivée : le compte est immédiatement actif.
+destinée au propriétaire (ex. `owner@jacob-de-jesus.com`). Un e-mail
+de confirmation est envoyé : cliquer sur le lien pour activer le
+compte.
 
 ### Étape 2 — Attribuer le rôle owner
 

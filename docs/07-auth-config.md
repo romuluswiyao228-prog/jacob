@@ -20,13 +20,31 @@ Ajouter :
 
 **Authentication → Providers → Email**
 
-Désactiver « Confirm email » (OFF). Les inscriptions sont immédiates,
-sans étape de confirmation par e-mail. L'utilisateur peut se connecter
-dès son inscription.
+Laisser « Confirm email » activé (ON). Les nouveaux utilisateurs
+reçoivent un e-mail de confirmation et doivent cliquer sur le lien
+avant de pouvoir se connecter. L'application gère ce flux : après
+l'inscription, un message demande à l'utilisateur de vérifier sa
+boîte de réception. La tentative de connexion avant confirmation
+affiche « Veuillez confirmer votre e-mail avant de vous connecter. »
 
 ### 4. Modèles d'e-mails (français)
 
 **Authentication → Email Templates**
+
+Personnaliser le modèle « Confirm signup » :
+
+- Subject : `Confirmez votre inscription — JACOB DE JESUS`
+- Body :
+  ```
+  Bonjour,
+
+  Bienvenue sur JACOB DE JESUS ! Pour activer votre compte,
+  cliquez sur le lien ci-dessous :
+
+  {{ .ConfirmationURL }}
+
+  — L'équipe JACOB DE JESUS
+  ```
 
 Personnaliser le modèle « Reset password » :
 

@@ -23,6 +23,8 @@ DELETE FROM public.user_roles WHERE user_id IN (
 DELETE FROM public.profiles WHERE email LIKE 'authtest-%';
 DELETE FROM auth.users WHERE email LIKE 'authtest-%';
 
+BEGIN;
+
 -- Créer un client A, un client B et un propriétaire C
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, aud, role)
 VALUES
@@ -195,12 +197,25 @@ FROM (
 ) t;
 
 -- 5d : Écriture store_settings (update admin-only)
-SELECT 'TEST 5d (owner aal1 ne modifie pas store_settings)' AS test,
-  count(*) AS updated,
-  CASE WHEN count(*) = 0 THEN 'RÉUSSI' ELSE 'ÉCHEC' END AS resultat
-FROM (
-  UPDATE public.store_settings SET store_name = store_name RETURNING 1
-) t;
+-- Vérifie qu'une ligne existe, puis que l'UPDATE est bloqué par RLS.
+DO $
+DECLARE
+  rc int;
+  settings_count int;
+BEGIN
+  SELECT count(*) INTO settings_count FROM public.store_settings;
+  IF settings_count = 0 THEN
+    RAISE NOTICE 'TEST 5d: ÉCHEC — aucune ligne dans store_settings, test impossible';
+    RETURN;
+  END IF;
+  UPDATE public.store_settings SET store_name = store_name;
+  GET DIAGNOSTICS rc = ROW_COUNT;
+  IF rc = 0 THEN
+    RAISE NOTICE 'TEST 5d: RÉUSSI — owner aal1 ne modifie pas store_settings (ROW_COUNT=%, lignes existantes=%)', rc, settings_count;
+  ELSE
+    RAISE NOTICE 'TEST 5d: ÉCHEC — owner aal1 a modifié store_settings (ROW_COUNT=%)', rc;
+  END IF;
+END $;
 
 RESET role;
 RESET request.jwt.claims;
@@ -232,6 +247,20 @@ SELECT 'TEST 6c (owner aal2 lit contact_messages)' AS test,
   count(*) AS msg_count,
   CASE WHEN count(*) > 0 THEN 'RÉUSSI' ELSE 'ÉCHEC' END AS resultat
 FROM public.contact_messages;
+
+-- 6d : Modification store_settings (contrôle positif aal2)
+DO $
+DECLARE
+  rc int;
+BEGIN
+  UPDATE public.store_settings SET store_name = store_name;
+  GET DIAGNOSTICS rc = ROW_COUNT;
+  IF rc = 1 THEN
+    RAISE NOTICE 'TEST 6d: RÉUSSI — owner aal2 modifie store_settings (ROW_COUNT=%)', rc;
+  ELSE
+    RAISE NOTICE 'TEST 6d: ÉCHEC — owner aal2 n''a pas modifié store_settings (ROW_COUNT=%)', rc;
+  END IF;
+END $;
 
 RESET role;
 RESET request.jwt.claims;
@@ -276,19 +305,9 @@ RESET request.jwt.claims;
 SELECT 'TEST 8' AS test, 'Couvert par Vitest (redirection UI non testable en SQL)' AS resultat;
 
 -- ============================================================
--- NETTOYAGE
+-- FIN : ROLLBACK annule toutes les insertions de test
 -- ============================================================
 
-DELETE FROM public.contact_messages WHERE subject LIKE 'AUTHTEST-%';
-DELETE FROM public.addresses WHERE line1 LIKE 'AUTHTEST-%';
-DELETE FROM public.products WHERE slug LIKE 'authtest-%';
-DELETE FROM public.user_roles WHERE user_id IN (
-  'a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1',
-  'b2b2b2b2-b2b2-b2b2-b2b2-b2b2b2b2b2b2',
-  'c3c3c3c3-c3c3-c3c3-c3c3-c3c3c3c3c3c3',
-  'f6f6f6f6-f6f6-f6f6-f6f6-f6f6f6f6f6f6'
-);
-DELETE FROM public.profiles WHERE email LIKE 'authtest-%';
-DELETE FROM auth.users WHERE email LIKE 'authtest-%';
+ROLLBACK;
 
-SELECT 'NETTOYAGE TERMINÉ' AS status;
+SELECT 'TRANSACTION ANNULÉE (ROLLBACK)' AS status;
