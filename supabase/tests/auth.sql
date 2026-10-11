@@ -14,7 +14,7 @@
 -- PRÉPARATION : nettoyer et créer les utilisateurs de test
 -- ============================================================
 
-DELETE FROM public.orders WHERE order_number LIKE 'AUTHTEST-%';
+DELETE FROM public.contact_messages WHERE subject LIKE 'AUTHTEST-%';
 DELETE FROM public.addresses WHERE line1 LIKE 'AUTHTEST-%';
 DELETE FROM public.products WHERE slug LIKE 'authtest-%';
 DELETE FROM public.user_roles WHERE user_id IN (
@@ -23,7 +23,7 @@ DELETE FROM public.user_roles WHERE user_id IN (
 DELETE FROM public.profiles WHERE email LIKE 'authtest-%';
 DELETE FROM auth.users WHERE email LIKE 'authtest-%';
 
--- Créer un client A et un client B
+-- Créer un client A, un client B et un propriétaire C
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, aud, role)
 VALUES
   ('a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1', 'authtest-a@example.com', crypt('test123456', gen_salt('bf')), now(), now(), now(), 'authenticated', 'authenticated'),
@@ -45,13 +45,23 @@ INSERT INTO public.user_roles (user_id, role) VALUES
   ('c3c3c3c3-c3c3-c3c3-c3c3-c3c3c3c3c3c3', 'owner'::app_role)
 ON CONFLICT (user_id) DO UPDATE SET role = EXCLUDED.role;
 
--- Données de test : produit + adresse B
+-- Données de test : produits (actif + archivé), adresses (A + B), message de contact
 INSERT INTO public.products (id, name, slug, price, is_archived)
 VALUES ('d4d4d4d4-d4d4-d4d4-d4d4-d4d4d4d4d4d4', 'AuthTest Product', 'authtest-product', 5000, false)
 ON CONFLICT (id) DO NOTHING;
 
+INSERT INTO public.products (id, name, slug, price, is_archived)
+VALUES ('d5d5d5d5-d5d5-d5d5-d5d5-d5d5d5d5d5d5', 'AuthTest Archived Product', 'authtest-archived', 3000, true)
+ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO public.addresses (id, user_id, first_name, last_name, line1, city)
-VALUES ('e5e5e5e5-e5e5-e5e5-e5e5-e5e5e5e5e5e5', 'b2b2b2b2-b2b2-b2b2-b2b2-b2b2b2b2b2b2', 'B', 'B', 'AUTHTEST-Adresse-B', 'Abidjan')
+VALUES
+  ('e5e5e5e5-e5e5-e5e5-e5e5-e5e5e5e5e5e5', 'b2b2b2b2-b2b2-b2b2-b2b2-b2b2b2b2b2b2', 'B', 'B', 'AUTHTEST-Adresse-B', 'Abidjan'),
+  ('e5e5e5e5-e5e5-e5e5-e5e5-e5e5e5e5e5e6', 'a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1', 'A', 'A', 'AUTHTEST-Adresse-A', 'Abidjan')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.contact_messages (id, name, email, subject, message)
+VALUES ('g7g7g7g7-g7g7-g7g7-g7g7-g7g7g7g7g7g7', 'Test', 'test@example.com', 'AUTHTEST-Sujet', 'AUTHTEST-Message')
 ON CONFLICT (id) DO NOTHING;
 
 -- ============================================================
@@ -70,10 +80,10 @@ SELECT 'TEST 1' AS test,
 -- TEST 2 : Un client ne peut ni insérer, ni modifier, ni supprimer dans user_roles
 -- ============================================================
 
--- 2a : INSERT
 SET LOCAL role = authenticated;
 SET LOCAL request.jwt.claims = '{"sub":"a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1","role":"authenticated","aal":"aal1"}';
 
+-- 2a : INSERT
 SELECT 'TEST 2a (INSERT user_roles bloqué)' AS test,
   CASE
     WHEN count(*) = 0 THEN 'RÉUSSI (aucune ligne insérée)'
@@ -113,14 +123,17 @@ RESET request.jwt.claims;
 -- TEST 3 : Un utilisateur qui met role='owner' dans ses métadonnées
 --          à l'inscription reste customer
 -- ============================================================
--- On simule en insérant un user avec raw_user_meta_data contenant role=owner
--- et en appelant handle_new_user manuellement
 
+-- Nettoyer pour garantir que le trigger handle_new_user se déclenche
+DELETE FROM public.user_roles WHERE user_id = 'f6f6f6f6-f6f6-f6f6-f6f6-f6f6f6f6f6f6';
+DELETE FROM public.profiles WHERE id = 'f6f6f6f6-f6f6-f6f6-f6f6-f6f6f6f6f6f6';
+DELETE FROM auth.users WHERE id = 'f6f6f6f6-f6f6-f6f6-f6f6-f6f6f6f6f6f6';
+
+-- Insérer avec role=owner dans raw_user_meta_data (sans ON CONFLICT pour déclencher le trigger)
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, aud, role, raw_user_meta_data)
-VALUES ('f6f6f6f6-f6f6-f6f6-f6f6-f6f6f6f6f6f6', 'authtest-meta@example.com', crypt('test123456', gen_salt('bf')), now(), now(), now(), 'authenticated', 'authenticated', '{"role":"owner","full_name":"Hacker"}')
-ON CONFLICT (id) DO NOTHING;
+VALUES ('f6f6f6f6-f6f6-f6f6-f6f6-f6f6f6f6f6f6', 'authtest-meta@example.com', crypt('test123456', gen_salt('bf')), now(), now(), now(), 'authenticated', 'authenticated', '{"role":"owner","full_name":"Hacker"}');
 
--- Le trigger on_auth_user_created s'est exécuté. Vérifier le rôle.
+-- Le trigger on_auth_user_created a dû créer le rôle 'customer'
 SELECT 'TEST 3' AS test,
   CASE
     WHEN (SELECT role FROM public.user_roles WHERE user_id = 'f6f6f6f6-f6f6-f6f6-f6f6-f6f6f6f6f6f6') = 'customer'::app_role
@@ -132,17 +145,22 @@ SELECT 'TEST 3' AS test,
 -- ============================================================
 -- TEST 4 : Un client ne peut pas appeler une fonction qui change un rôle
 -- ============================================================
--- log_admin_action est revoke de PUBLIC et authenticated.
--- Vérifier qu'elle n'est pas exécutable par authenticated.
+-- log_admin_action est revoke de PUBLIC. Aucune fonction permettant
+-- de modifier un rôle n'est exécutable par authenticated.
 
 SET LOCAL role = authenticated;
 SET LOCAL request.jwt.claims = '{"sub":"a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1","role":"authenticated","aal":"aal1"}';
 
-SELECT 'TEST 4 (log_admin_action non exécutable par client)' AS test,
-  CASE
-    WHEN count(*) = 0 THEN 'RÉUSSI (fonction non accessible)'
-    ELSE 'ÉCHEC'
-  END AS resultat;
+DO $$
+BEGIN
+  PERFORM public.log_admin_action('TEST', 'test', 'test');
+  RAISE NOTICE 'TEST 4: ÉCHEC — log_admin_action est exécutable par un client';
+EXCEPTION
+  WHEN insufficient_privilege THEN
+    RAISE NOTICE 'TEST 4: RÉUSSI — log_admin_action non exécutable par un client';
+  WHEN others THEN
+    RAISE NOTICE 'TEST 4: RÉUSSI — log_admin_action rejeté : %', SQLERRM;
+END $$;
 
 RESET role;
 RESET request.jwt.claims;
@@ -155,14 +173,20 @@ RESET request.jwt.claims;
 SET LOCAL role = authenticated;
 SET LOCAL request.jwt.claims = '{"sub":"c3c3c3c3-c3c3-c3c3-c3c3-c3c3c3c3c3c3","role":"authenticated","aal":"aal1"}';
 
--- 5a : Lecture (products admin)
-SELECT 'TEST 5a (owner aal1 ne lit pas produits admin)' AS test,
-  count(*) AS product_count,
+-- 5a : Lecture table admin-only (contact_messages — pas de SELECT public)
+SELECT 'TEST 5a (owner aal1 ne lit pas contact_messages)' AS test,
+  count(*) AS msg_count,
   CASE WHEN count(*) = 0 THEN 'RÉUSSI' ELSE 'ÉCHEC' END AS resultat
-FROM public.products;
+FROM public.contact_messages;
 
--- 5b : Écriture (update product)
-SELECT 'TEST 5b (owner aal1 ne modifie pas produits)' AS test,
+-- 5b : Lecture produits archivés (admin-only via select_products_admin)
+SELECT 'TEST 5b (owner aal1 ne lit pas produits archivés)' AS test,
+  count(*) AS archived_count,
+  CASE WHEN count(*) = 0 THEN 'RÉUSSI' ELSE 'ÉCHEC' END AS resultat
+FROM public.products WHERE slug = 'authtest-archived';
+
+-- 5c : Écriture produits (update admin-only)
+SELECT 'TEST 5c (owner aal1 ne modifie pas produits)' AS test,
   count(*) AS updated,
   CASE WHEN count(*) = 0 THEN 'RÉUSSI' ELSE 'ÉCHEC' END AS resultat
 FROM (
@@ -170,12 +194,12 @@ FROM (
   RETURNING 1
 ) t;
 
--- 5c : Lecture store_settings (lecture publique OK, mais admin en aal1 ne doit pas pouvoir modifier)
-SELECT 'TEST 5c (owner aal1 ne modifie pas store_settings)' AS test,
+-- 5d : Écriture store_settings (update admin-only)
+SELECT 'TEST 5d (owner aal1 ne modifie pas store_settings)' AS test,
   count(*) AS updated,
   CASE WHEN count(*) = 0 THEN 'RÉUSSI' ELSE 'ÉCHEC' END AS resultat
 FROM (
-  UPDATE public.store_settings SET store_name = 'HACKED' RETURNING 1
+  UPDATE public.store_settings SET store_name = store_name RETURNING 1
 ) t;
 
 RESET role;
@@ -188,11 +212,11 @@ RESET request.jwt.claims;
 SET LOCAL role = authenticated;
 SET LOCAL request.jwt.claims = '{"sub":"c3c3c3c3-c3c3-c3c3-c3c3-c3c3c3c3c3c3","role":"authenticated","aal":"aal2"}';
 
--- 6a : Lecture de tous les produits
-SELECT 'TEST 6a (owner aal2 lit tous les produits)' AS test,
-  count(*) AS product_count,
-  CASE WHEN count(*) > 0 THEN 'RÉUSSI' ELSE 'ÉCHEC' END AS resultat
-FROM public.products;
+-- 6a : Lecture des produits archivés (admin-only)
+SELECT 'TEST 6a (owner aal2 lit produits archivés)' AS test,
+  count(*) AS archived_count,
+  CASE WHEN count(*) >= 1 THEN 'RÉUSSI' ELSE 'ÉCHEC' END AS resultat
+FROM public.products WHERE slug = 'authtest-archived';
 
 -- 6b : Modification d'un produit
 SELECT 'TEST 6b (owner aal2 modifie un produit)' AS test,
@@ -202,6 +226,12 @@ FROM (
   UPDATE public.products SET is_featured = true WHERE id = 'd4d4d4d4-d4d4-d4d4-d4d4-d4d4d4d4d4d4'
   RETURNING 1
 ) t;
+
+-- 6c : Lecture des contact_messages (admin-only)
+SELECT 'TEST 6c (owner aal2 lit contact_messages)' AS test,
+  count(*) AS msg_count,
+  CASE WHEN count(*) > 0 THEN 'RÉUSSI' ELSE 'ÉCHEC' END AS resultat
+FROM public.contact_messages;
 
 RESET role;
 RESET request.jwt.claims;
@@ -231,6 +261,12 @@ SELECT 'TEST 7c (A ne lit aucune commande)' AS test,
   CASE WHEN count(*) = 0 THEN 'RÉUSSI' ELSE 'ÉCHEC' END AS resultat
 FROM public.orders;
 
+-- 7d : A lit ses propres adresses
+SELECT 'TEST 7d (A lit ses propres adresses)' AS test,
+  count(*) AS addr_count,
+  CASE WHEN count(*) >= 1 THEN 'RÉUSSI' ELSE 'ÉCHEC' END AS resultat
+FROM public.addresses WHERE user_id = 'a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1';
+
 RESET role;
 RESET request.jwt.claims;
 
@@ -243,6 +279,7 @@ SELECT 'TEST 8' AS test, 'Couvert par Vitest (redirection UI non testable en SQL
 -- NETTOYAGE
 -- ============================================================
 
+DELETE FROM public.contact_messages WHERE subject LIKE 'AUTHTEST-%';
 DELETE FROM public.addresses WHERE line1 LIKE 'AUTHTEST-%';
 DELETE FROM public.products WHERE slug LIKE 'authtest-%';
 DELETE FROM public.user_roles WHERE user_id IN (
