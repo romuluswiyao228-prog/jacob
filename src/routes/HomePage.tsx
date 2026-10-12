@@ -7,6 +7,7 @@ import {
   useNewProducts,
   useBestSellers,
   useFeaturedProducts,
+  usePromoProducts,
   useCollections,
 } from "@/lib/hooks";
 import type { ProductCardData } from "@/components/ui";
@@ -17,12 +18,13 @@ function productToCardData(
   product: ProductWithImage,
   sizes: string[] = ["S", "M", "L", "XL"]
 ): ProductCardData {
-  const hasDiscount = false; // No promo price column in current schema
+  const hasDiscount = product.compare_at_price != null && product.compare_at_price > product.price;
   return {
     id: product.id,
     name: product.name,
     reference: product.slug.toUpperCase(),
     price: product.price,
+    originalPrice: hasDiscount ? product.compare_at_price : null,
     image: product.primary_image?.url ?? "",
     imageAlt: product.primary_image?.alt_text ?? product.name,
     sizes,
@@ -67,11 +69,18 @@ export default function HomePage() {
     error: colError,
     refetch: refetchCollections,
   } = useCollections(6);
+  const {
+    data: promoProducts,
+    isLoading: promoLoading,
+    error: promoError,
+    refetch: refetchPromo,
+  } = usePromoProducts(8);
 
   const hasNewProducts = (newProducts?.length ?? 0) > 0;
   const hasBestSellers = (bestSellers?.length ?? 0) > 0;
   const hasFeatured = (featured?.length ?? 0) > 0;
   const hasCollections = (collections?.length ?? 0) > 0;
+  const hasPromoProducts = (promoProducts?.length ?? 0) > 0;
   const hasCategories = (categories?.length ?? 0) > 0;
   const hasAboutText =
     settings?.about_text && settings.about_text.trim().length > 0;
@@ -184,7 +193,22 @@ export default function HomePage() {
         )}
 
         {/* === SECTION 5: Promotions === */}
-        {/* No promo price column in current product schema — section hidden */}
+        <Section
+          title="Promotions"
+          isLoading={promoLoading}
+          error={promoError}
+          hasData={hasPromoProducts}
+          onRetry={refetchPromo}
+        >
+          <div className={styles.productGrid}>
+            {(promoProducts ?? []).map((p) => (
+              <ProductCard
+                key={p.id}
+                product={productToCardData(p)}
+              />
+            ))}
+          </div>
+        </Section>
 
         {/* === SECTION 6: Collections mises en avant === */}
         <Section

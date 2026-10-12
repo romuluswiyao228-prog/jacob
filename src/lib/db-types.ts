@@ -22,6 +22,7 @@ export interface Product {
   slug: string;
   description: string | null;
   price: number;
+  compare_at_price: number | null;
   currency: string;
   category_id: string | null;
   is_archived: boolean;
@@ -63,6 +64,25 @@ export interface StoreSettings {
   cgv: string | null;
   privacy_policy: string | null;
   about_text: string | null;
+  announcement_text: string | null;
+  whatsapp_number: string | null;
+}
+
+export interface PublicStoreSettings {
+  store_name: string;
+  tagline: string | null;
+  description: string | null;
+  logo_url: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  country: string;
+  currency: string;
+  social_links: Record<string, string>;
+  about_text: string | null;
+  announcement_text: string | null;
+  whatsapp_number: string | null;
 }
 
 export interface BestSeller {

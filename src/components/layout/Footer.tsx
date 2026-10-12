@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
-import type { StoreSettings } from "@/lib/db-types";
+import type { PublicStoreSettings } from "@/lib/db-types";
 import styles from "./Footer.module.css";
 
 interface FooterProps {
-  settings: StoreSettings | null;
+  settings: PublicStoreSettings | null;
 }
 
 export function Footer({ settings }: FooterProps) {
@@ -13,10 +13,6 @@ export function Footer({ settings }: FooterProps) {
   const hasCity = settings?.city && settings.city.trim().length > 0;
   const hasSocial =
     settings?.social_links && Object.keys(settings.social_links).length > 0;
-  const hasLegal = settings?.legal_mentions && settings.legal_mentions.trim().length > 0;
-  const hasCgv = settings?.cgv && settings.cgv.trim().length > 0;
-  const hasPrivacy =
-    settings?.privacy_policy && settings.privacy_policy.trim().length > 0;
 
   const socialEntries = hasSocial
     ? Object.entries(settings!.social_links).filter(
@@ -24,16 +20,9 @@ export function Footer({ settings }: FooterProps) {
       )
     : [];
 
-  const legalLinks: { label: string; to: string; hasContent: boolean }[] = [
-    { label: "Mentions légales", to: "/mentions-legales", hasContent: !!hasLegal },
-    { label: "CGV", to: "/cgv", hasContent: !!hasCgv },
-    { label: "Confidentialité", to: "/confidentialite", hasContent: !!hasPrivacy },
-  ];
-
   const hasContact = hasEmail || hasPhone || hasAddress || hasCity;
-  const hasLegalLinks = legalLinks.some((l) => l.hasContent);
 
-  if (!hasContact && !hasLegalLinks && !hasSocial) {
+  if (!hasContact && !hasSocial) {
     return (
       <footer className={styles.footer}>
         <div className={styles.inner}>
@@ -86,20 +75,6 @@ export function Footer({ settings }: FooterProps) {
                     .join(", ")}
                 </p>
               )}
-            </div>
-          )}
-
-          {/* Legal */}
-          {hasLegalLinks && (
-            <div className={styles.col}>
-              <h3 className={styles.heading}>Informations</h3>
-              {legalLinks
-                .filter((l) => l.hasContent)
-                .map((l) => (
-                  <Link key={l.to} to={l.to} className={styles.link}>
-                    {l.label}
-                  </Link>
-                ))}
             </div>
           )}
 

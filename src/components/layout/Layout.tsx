@@ -10,11 +10,15 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return (
     <>
-      {settings?.tagline && <AnnouncementBanner text={settings.tagline} />}
+      {settings?.announcement_text && (
+        <AnnouncementBanner text={settings.announcement_text} />
+      )}
       <Header storeName={settings?.store_name ?? "JACOB DE JESUS"} />
       <main>{children}</main>
       <Footer settings={settings} />
-      {settings?.phone && <WhatsAppButton phone={settings.phone} />}
+      {settings?.whatsapp_number && (
+        <WhatsAppButton phone={settings.whatsapp_number} />
+      )}
     </>
   );
 }

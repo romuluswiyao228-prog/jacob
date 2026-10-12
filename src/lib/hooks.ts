@@ -4,7 +4,7 @@ import type {
   Category,
   ProductWithImage,
   Collection,
-  StoreSettings,
+  PublicStoreSettings,
   BestSeller,
 } from "@/lib/db-types";
 
@@ -58,10 +58,10 @@ export function useCategories(): QueryState<Category[]> {
   });
 }
 
-export function useStoreSettings(): QueryState<StoreSettings> {
+export function useStoreSettings(): QueryState<PublicStoreSettings> {
   return useQuery(async () => {
     const { data, error } = await supabase
-      .from("store_settings")
+      .from("public_store_settings")
       .select("*")
       .limit(1)
       .maybeSingle();
@@ -75,7 +75,7 @@ export function useNewProducts(limit = 8): QueryState<ProductWithImage[]> {
   return useQuery(async () => {
     const { data: products, error } = await supabase
       .from("products")
-      .select("id, name, slug, description, price, currency, category_id, is_archived, is_featured, sort_order, created_at")
+      .select("id, name, slug, description, price, compare_at_price, currency, category_id, is_archived, is_featured, sort_order, created_at")
       .eq("is_archived", false)
       .order("created_at", { ascending: false })
       .limit(limit);
@@ -129,7 +129,7 @@ export function useFeaturedProducts(limit = 8): QueryState<ProductWithImage[]> {
   return useQuery(async () => {
     const { data: products, error } = await supabase
       .from("products")
-      .select("id, name, slug, description, price, currency, category_id, is_archived, is_featured, sort_order, created_at")
+      .select("id, name, slug, description, price, compare_at_price, currency, category_id, is_archived, is_featured, sort_order, created_at")
       .eq("is_archived", false)
       .eq("is_featured", true)
       .order("sort_order", { ascending: true })
@@ -219,6 +219,44 @@ export function useBestSellers(limit = 8): QueryState<BestSeller[]> {
       }));
 
     return { data: sorted, error: null };
+  }, [limit]);
+}
+
+export function usePromoProducts(limit = 8): QueryState<ProductWithImage[]> {
+  return useQuery(async () => {
+    const { data: products, error } = await supabase
+      .from("products")
+      .select("id, name, slug, description, price, compare_at_price, currency, category_id, is_archived, is_featured, sort_order, created_at")
+      .eq("is_archived", false)
+      .not("compare_at_price", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) return { data: null, error: error.message };
+    if (!products || products.length === 0) return { data: [], error: null };
+
+    const productIds = products.map((p) => p.id);
+    const { data: images } = await supabase
+      .from("product_images")
+      .select("id, product_id, url, alt_text, sort_order, is_primary")
+      .in("product_id", productIds)
+      .order("is_primary", { ascending: false })
+      .order("sort_order", { ascending: true });
+
+    const imageMap = new Map<string, NonNullable<typeof images>[number]>();
+    for (const img of images ?? []) {
+      if (!imageMap.has(img.product_id)) {
+        imageMap.set(img.product_id, img);
+      }
+    }
+
+    const enriched: ProductWithImage[] = products.map((p) => ({
+      ...p,
+      primary_image: imageMap.get(p.id) ?? null,
+      category: null,
+    }));
+
+    return { data: enriched, error: null };
   }, [limit]);
 }
 
