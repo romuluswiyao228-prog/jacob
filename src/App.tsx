@@ -13,6 +13,8 @@ const AdminLoginPage = lazy(() => import("@/routes/admin/AdminLoginPage"));
 const MfaSetupPage = lazy(() => import("@/routes/admin/MfaSetupPage"));
 const AdminDashboardPage = lazy(() => import("@/routes/admin/AdminDashboardPage"));
 
+const DesignSystemPage = lazy(() => import("@/routes/DesignSystemPage"));
+
 function PageFallback() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-neutral-50">
@@ -56,6 +58,12 @@ export default function App() {
 
             {/* Placeholder home */}
             <Route path="/" element={<div className="min-h-screen bg-neutral-50" />} />
+
+            {/* Design system — dev only */}
+            {import.meta.env.DEV && (
+              <Route path="/design-system" element={<DesignSystemPage />} />
+            )}
+
             <Route path="*" element={<div className="min-h-screen bg-neutral-50" />} />
           </Routes>
         </Suspense>
