@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { act, type ReactNode } from "react";
+import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import type { User } from "@supabase/supabase-js";
@@ -35,7 +35,7 @@ function makeAuthState(overrides: Partial<AuthState> = {}): AuthState {
 
 let roots: Root[] = [];
 
-async function renderInRouter(element: ReactNode): Promise<HTMLDivElement> {
+async function renderInRouter(element: ReactElement): Promise<HTMLDivElement> {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -60,9 +60,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  act(() => {
-    roots.forEach((r) => r.unmount());
-  });
+  roots.forEach((r) => r.unmount());
   roots = [];
   document.body.innerHTML = "";
 });
